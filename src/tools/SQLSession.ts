@@ -50,6 +50,7 @@ export class SQLSession {
         if (list === undefined) {
           throw 'avg函数的参数不能为空';
         }
+        list = list.filter((i) => i[0] != null);
         let count = 0;
         let sum = 0;
         for (let line of list) {
