@@ -1,6 +1,6 @@
 {
   "name": "toysql-in-js",
-  "version": "1.0.42",
+  "version": "1.0.43",
   "description": "Write query SQL directly in your JavaScript",
   "license": "ISC",
   "author": "",
