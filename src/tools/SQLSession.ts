@@ -35,12 +35,14 @@ export class SQLSession {
     concat: {
       type: 'normal',
       handler: (...args) => {
-        return args.reduce((p, c) => `${p}${c}`);
+        return args.filter(item=>item!===null).reduce((p, c) => `${p}${c}`);
       },
     },
     split: {
       type: 'normal',
       handler: (str: string, pattern: string) => {
+        if(str===null)
+           return null;
         return str.split(pattern);
       },
     },
@@ -50,7 +52,7 @@ export class SQLSession {
         if (list === undefined) {
           throw 'avg函数的参数不能为空';
         }
-        list = list.filter((i) => i[0] != null);
+        list = list.filter((i) => i[0] !== null);
         let count = 0;
         let sum = 0;
         for (let line of list) {
@@ -66,7 +68,7 @@ export class SQLSession {
     count: {
       type: 'aggregate',
       handler: (list, modifier?: 'distinct' | 'all') => {
-        list = list.filter((i) => i[0] != null);
+        list = list.filter((i) => i[0] !== null);
         if (list === undefined) {
           throw `count函数的参数不能为空`;
         }
@@ -84,7 +86,7 @@ export class SQLSession {
     sum: {
       type: 'aggregate',
       handler: (list, modifier?: 'distinct' | 'all') => {
-        list = list.filter((i) => i[0] != null);
+        list = list.filter((i) => i[0] !== null);
         if (list[0][0] === undefined) {
           throw `sum函数的参数不能为空`;
         }
