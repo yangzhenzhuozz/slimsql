@@ -1298,8 +1298,13 @@ export class SQLContext {
           [t2, id2] = rc.value!.split('.');
         }
         if (t1 != undefined && t2 != undefined && t1 != t2) {
-          //使用加速连接
-          joinResult = this.sortMergeLeftJoin({ t1: t1!, id1: id1!, t2: t2!, id2: id2! });
+          //使用加速连接,保证传递给sortMergeLeftJoin的左表放到t1,右表放到t2
+          if (right === t2) {
+            joinResult = this.sortMergeLeftJoin({ t1: t1!, id1: id1!, t2: t2!, id2: id2! });
+          }else{
+            joinResult = this.sortMergeLeftJoin({ t1: t2!, id1: id2!, t2: t1!, id2: id1! });
+          }
+
           isFastJoin = true;
         } else {
           //使用笛卡尔积
