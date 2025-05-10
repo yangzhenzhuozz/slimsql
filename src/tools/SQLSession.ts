@@ -35,7 +35,7 @@ export class SQLSession {
     concat: {
       type: 'normal',
       handler: (...args) => {
-        return args.filter(item=>item!===null).reduce((p, c) => `${p}${c}`);
+        return args.filter(item=>item!==null).reduce((p, c) => `${p}${c}`);
       },
     },
     split: {
