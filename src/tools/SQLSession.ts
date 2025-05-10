@@ -933,6 +933,9 @@ export class SQLContext {
         id = exp.targetName;
       } else if (exp.op === 'windowFunction') {
         windowFrames.push(exp.windowFunction!);
+        if (exp.windowFunction?.alias !== undefined) {
+          id = exp.windowFunction?.alias;
+        }
       }
       if (id !== undefined) {
         if (directField.has(id)) {
@@ -951,6 +954,15 @@ export class SQLContext {
           retFields.add(field);
         } else {
           retFields.add(exp.targetName);
+        }
+      }else if (exp.op === 'windowFunction') {
+        if (exp.windowFunction?.alias !== undefined) {
+          field = exp.windowFunction?.alias;
+          if (!duplicateField.has(field)) {
+            retFields.add(field);
+          } else {
+            retFields.add(exp.targetName);
+          }
         }
       } else {
         retFields.add(exp.targetName);
