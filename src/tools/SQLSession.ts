@@ -1,7 +1,6 @@
 import { assert } from './assert.js';
 import { WindowFunction, Cell, ExpNode, SelectClause } from './ExpTree.js';
 import { Lexical } from './Lexical.js';
-import { NeedGroupError } from './NeedGroupError.js';
 import Parse from './SQLParser.js';
 export type FieldType = {
   name: string;
@@ -32,28 +31,63 @@ export class SQLSession {
     };
   } = {};
   public udf: UDF = {
+    round: {
+      type: 'normal',
+      handler: (v: number | bigint, dig?: number) => {
+        if (v === undefined) {
+          throw `round参数不能为空`;
+        }
+        if (v === null) {
+          return null;
+        }
+        if (typeof v !== 'number') {
+          throw `round函数只能处理number`;
+        }
+        if (dig !== undefined) {
+          return v.toFixed(dig);
+        } else {
+          return Math.round(v);
+        }
+      },
+    },
     concat: {
       type: 'normal',
       handler: (...args) => {
-        if(args.indexOf(null)!=-1) return null;
-        return args.reduce((p, c) => `${p}${c}`);
+        if (args.length == 0) {
+          throw `concat参数不能为空`;
+        }
+        if (args.length == 1) {
+          return `${args[0]}`;
+        }
+        let ret = '';
+        for (let i = 0; i < args.length; i++) {
+          if (args[i] === null) {
+            return null;
+          }
+          ret += `${args[i]}`;
+        }
+        return ret;
       },
     },
     split: {
       type: 'normal',
       handler: (str: string, pattern: string) => {
-        if(str===null)
-           return null;
+        if (str === null || pattern === null) {
+          return null;
+        }
         return str.split(pattern);
       },
     },
     avg: {
       type: 'aggregate',
       handler: (list: number[][]) => {
-        if (list === undefined) {
-          throw 'avg函数的参数不能为空';
+        if (list[0].length == 0) {
+          throw `list函数的参数不能为空`;
         }
         list = list.filter((i) => i[0] !== null);
+        if (list.length == 0) {
+          return null;
+        }
         let count = 0;
         let sum = 0;
         for (let line of list) {
@@ -69,11 +103,13 @@ export class SQLSession {
     count: {
       type: 'aggregate',
       handler: (list, modifier?: 'distinct' | 'all') => {
-        list = list.filter((i) => i[0] !== null);
-        if (list === undefined) {
+        if (list[0].length == 0) {
           throw `count函数的参数不能为空`;
         }
-
+        list = list.filter((i) => i[0] !== null);
+        if (list.length == 0) {
+          return 0;
+        }
         if (modifier === 'all') {
           throw `还不支持modifier:all`;
         } else if (modifier === 'distinct') {
@@ -87,11 +123,13 @@ export class SQLSession {
     sum: {
       type: 'aggregate',
       handler: (list, modifier?: 'distinct' | 'all') => {
-        list = list.filter((i) => i[0] !== null);
-        if (list[0][0] === undefined) {
+        if (list[0].length == 0) {
           throw `sum函数的参数不能为空`;
         }
-
+        list = list.filter((i) => i[0] !== null);
+        if (list.length == 0) {
+          return null;
+        }
         assert(typeof list[0][0] == 'number', 'sum只能累加数字');
 
         if (modifier === 'all') {
@@ -257,7 +295,7 @@ export class SQLContext {
    */
   private execExp(exp: ExpNode, rowIdx: number, callerOption: { isRecursive: boolean; inAggregate: boolean }): ExpNode {
     //避免字段名和计算结果一样，比如取一个名字叫做`concat(id,'a')`的字段，会造成误判
-    if (exp.op != 'immediate_val' && exp.op != 'getfield' && exp.op != 'getTableField' && this.computedData[rowIdx]!= undefined && this.computedData[rowIdx][exp.targetName] !== undefined) {
+    if (exp.op != 'immediate_val' && exp.op != 'getfield' && exp.op != 'getTableField' && this.computedData[rowIdx] != undefined && this.computedData[rowIdx][exp.targetName] !== undefined) {
       return {
         op: 'immediate_val',
         targetName: exp.targetName,
@@ -902,7 +940,6 @@ export class SQLContext {
       return 0;
     };
 
-
     newOrder.sort(compare);
 
     let reOrderData = (data: any[], idxList: number[]): any[] => {
@@ -923,7 +960,7 @@ export class SQLContext {
     this.groupDS = reOrderData(this.groupDS, newOrder);
     this.select_normal = false; //因为使用到了execExp，所以重置
   }
-  public select(select_clause: SelectClause, orderClause?:ExpNode[]): { data: Cell[]; fields: Set<string> } {
+  public select(select_clause: SelectClause, orderClause?: ExpNode[]): { data: Cell[]; fields: Set<string> } {
     let exps = select_clause.nodes;
     let arr = [] as any[];
     let windowFrames = [] as WindowFunction[];
@@ -959,7 +996,7 @@ export class SQLContext {
         } else {
           retFields.add(exp.targetName);
         }
-      }else if (exp.op === 'windowFunction') {
+      } else if (exp.op === 'windowFunction') {
         if (exp.windowFunction?.alias !== undefined) {
           field = exp.windowFunction?.alias;
           if (!duplicateField.has(field)) {
@@ -979,8 +1016,8 @@ export class SQLContext {
       }
     }
 
-    if(orderClause !== undefined){
-       this.orderBy(orderClause);
+    if (orderClause !== undefined) {
+      this.orderBy(orderClause);
     }
 
     for (let row_idx = 0; row_idx < this.rowSize; row_idx++) {
@@ -1317,7 +1354,7 @@ export class SQLContext {
           //使用加速连接,保证传递给sortMergeLeftJoin的左表放到t1,右表放到t2
           if (right === t2) {
             joinResult = this.sortMergeLeftJoin({ t1: t1!, id1: id1!, t2: t2!, id2: id2! });
-          }else{
+          } else {
             joinResult = this.sortMergeLeftJoin({ t1: t2!, id1: id2!, t2: t1!, id2: id1! });
           }
 
