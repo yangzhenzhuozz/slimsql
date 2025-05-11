@@ -1466,6 +1466,27 @@ export class SQLContext {
           this.intermediatView[tn].data.push(originData[idx]);
         }
       }
+      for (let tn of Object.getOwnPropertySymbols(this.intermediatView)) {
+        let originData = this.intermediatView[tn];
+        this.intermediatView[tn] = [];
+        for (let idx of resultIdx) {
+          this.intermediatView[tn].push(originData[idx]);
+        }
+      }
+      {
+        let originData = this.groupDS;
+        this.groupDS = [];
+        for (let idx of resultIdx) {
+          this.groupDS.push(originData[idx]);
+        }
+      }
+      {
+        let originData = this.windowFrameDS;
+        this.windowFrameDS = [];
+        for (let idx of resultIdx) {
+          this.windowFrameDS.push(originData[idx]);
+        }
+      }
       this.rowSize = resultIdx.length; //修改rowSize
       this.computedData = Array.from({ length: this.rowSize }, () => ({}));
     }
