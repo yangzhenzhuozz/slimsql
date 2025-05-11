@@ -1169,7 +1169,8 @@ export class SQLContext {
             frameContext.intermediatView = originTV;
             frameContext.intermediatView[Symbol.for('frameResult')][frameRowidx][field_key] = aggregateVal;
           }
-          for (let tn in frameContext.intermediatView) {
+        }
+        for (let tn in frameContext.intermediatView) {
             if (this.intermediatView[tn] === undefined) {
               this.intermediatView[tn] = {
                 data: frameContext.intermediatView[tn].data,
@@ -1185,7 +1186,6 @@ export class SQLContext {
             }
             this.intermediatView[tn] = this.intermediatView[tn].concat(frameContext.intermediatView[tn]);
           }
-        }
       } else if (this.udf[fn.windowFunction.value! as string].type == 'windowFrame') {
         //窗口函数不使用窗口范围
         if (fn.windowFunction.modifier != undefined) {
