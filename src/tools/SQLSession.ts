@@ -1166,8 +1166,8 @@ export class SQLContext {
             frameContext.intermediatView = tmpTV;
             frameContext.groupDS = [tmpTV];
             let aggregateVal = frameContext.execExp(fn.windowFunction, 0, { isRecursive: false, inAggregate: false }).value as Cell;
-            frameContext.intermediatView[Symbol.for('frameResult')][frameRowidx][field_key] = aggregateVal;
             frameContext.intermediatView = originTV;
+            frameContext.intermediatView[Symbol.for('frameResult')][frameRowidx][field_key] = aggregateVal;
           }
           for (let tn in frameContext.intermediatView) {
             if (this.intermediatView[tn] === undefined) {
