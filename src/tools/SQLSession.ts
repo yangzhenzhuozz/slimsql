@@ -456,11 +456,15 @@ export class SQLContext {
         break;
       case 'and':
         l_Child = this.execExp(children![0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
-        r_Child = this.execExp(children![1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
-        if ((l_Child.value === null && r_Child.value === null) || (!!l_Child.value && r_Child.value === null) || (l_Child.value === null && !!r_Child.value)) {
-          result = null;
+        if (l_Child.value === false) {
+          result = false;
         } else {
-          result = !!(l_Child.value! && r_Child.value!);
+          r_Child = this.execExp(children![1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
+          if ((l_Child.value === null && r_Child.value === null) || (!!l_Child.value && r_Child.value === null) || (l_Child.value === null && !!r_Child.value)) {
+            result = null;
+          } else {
+            result = !!(l_Child.value! && r_Child.value!);
+          }
         }
         break;
       case 'or':
@@ -469,10 +473,14 @@ export class SQLContext {
           result = true;
         } else {
           r_Child = this.execExp(children![1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
-          if (r_Child.value === null) {
+          if (
+            (l_Child.value === null && r_Child.value === null)||
+            (l_Child.value !== null&&!!l_Child.value==false  && r_Child.value === null)||
+            (l_Child.value === null && r_Child.value !== null &&!!r_Child.value==false)
+          ) {
             result = null;
           } else {
-            result = !!r_Child.value;
+            result = !!(l_Child.value || r_Child.value);
           }
         }
         break;
