@@ -465,11 +465,15 @@ export class SQLContext {
         break;
       case 'or':
         l_Child = this.execExp(children![0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
-        r_Child = this.execExp(children![1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
-        if (l_Child.value === null && r_Child.value === null) {
-          result = null;
+        if (!!l_Child.value) {
+          result = true;
         } else {
-          result = l_Child.value! || r_Child.value!;
+          r_Child = this.execExp(children![1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
+          if (r_Child.value === null) {
+            result = null;
+          } else {
+            result = !!r_Child.value;
+          }
         }
         break;
       case 'index':
