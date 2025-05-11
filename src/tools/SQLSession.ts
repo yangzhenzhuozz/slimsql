@@ -466,7 +466,7 @@ export class SQLContext {
       case 'or':
         l_Child = this.execExp(children![0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
         r_Child = this.execExp(children![1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
-        if (l_Child.value === null || r_Child.value === null) {
+        if (l_Child.value === null && r_Child.value === null) {
           result = null;
         } else {
           result = l_Child.value! || r_Child.value!;
