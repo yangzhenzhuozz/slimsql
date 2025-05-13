@@ -1382,6 +1382,7 @@ export class SQLContext {
 
           isFastJoin = true;
         } else {
+          console.log('只有当join条件为左右表各取一个字段，并进行等值连接时才有加速效果');
           //使用笛卡尔积
           let idxs1 = [] as number[];
           let idxs2 = [] as number[];
@@ -1437,7 +1438,6 @@ export class SQLContext {
 
     //使用笛卡尔积进行连接
     if (!isFastJoin && joinResult.length > 0) {
-      console.log('只有当join条件为左右表各取一个字段，并进行等值连接时才有加速效果');
       let resultIdx = [] as number[];
       let lastAddLeftIdx = -1; //上一次添加的左表下标
       for (let row_idx = 0; row_idx < joinResult.length; row_idx++) {
