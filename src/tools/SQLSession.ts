@@ -456,7 +456,7 @@ export class SQLContext {
         break;
       case 'and':
         l_Child = this.execExp(children![0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
-        if (l_Child.value === false) {
+        if (l_Child.value !==null &&!!l_Child.value === false) {
           result = false;
         } else {
           r_Child = this.execExp(children![1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
