@@ -765,7 +765,7 @@ export class SQLContext {
           }
           groupKeys.add(cell.targetName);
         }
-        groupComputed[i][Symbol.for(cell.targetName)] = exp;
+        groupComputed[i][Symbol.for(`@${cell.targetName}_exp`)] = exp;
         groupComputed[i][cell.targetName] = cell.value!;
         groupValues.push(cell.value! as any);
       }
@@ -846,7 +846,7 @@ export class SQLContext {
         let fields = Object.keys(groupLine[0]);
         for (let colIdx = 0; colIdx < fields.length; colIdx++) {
           let c = fields[colIdx];
-          let exp = groupLine[0][Symbol.for(c)] as ExpNode;
+          let exp = groupLine[0][Symbol.for(`@${c}_exp`)] as ExpNode;
           if (exp.op == 'getfield') {
             let tableName = this.directFieldT[exp.value];
             if (i == 0) {
