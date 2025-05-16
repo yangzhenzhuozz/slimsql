@@ -3,7 +3,7 @@ npm i slimsql
 # demo
 
 ```js
-import { SQLSession } from 'toysql-in-js';
+import { SQLSession } from 'slimsql';
 
 let arr = [
   { id: 1, gender: '男', name: 'john', score: 10 },

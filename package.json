@@ -35,10 +35,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yangzhenzhuozz/toysql-in-js.git"
+    "url": "git+https://github.com/yangzhenzhuozz/slimsql.git"
   },
   "bugs": {
-    "url": "https://github.com/yangzhenzhuozz/toysql-in-js/issues"
+    "url": "https://github.com/yangzhenzhuozz/slimsql/issues"
   },
-  "homepage": "https://github.com/yangzhenzhuozz/toysql-in-js#readme"
+  "homepage": "https://github.com/yangzhenzhuozz/slimsql#readme"
 }
