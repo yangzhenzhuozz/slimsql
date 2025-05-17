@@ -466,7 +466,7 @@ export class SQLContext {
         break;
       case 'and':
         l_Child = this.execExp(children![0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
-        if (l_Child.value !==null &&!!l_Child.value === false) {
+        if (l_Child.value !== null && !!l_Child.value === false) {
           result = false;
         } else {
           r_Child = this.execExp(children![1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
@@ -483,11 +483,7 @@ export class SQLContext {
           result = true;
         } else {
           r_Child = this.execExp(children![1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
-          if (
-            (l_Child.value === null && r_Child.value === null)||
-            (l_Child.value !== null&&!!l_Child.value==false  && r_Child.value === null)||
-            (l_Child.value === null && r_Child.value !== null &&!!r_Child.value==false)
-          ) {
+          if ((l_Child.value === null && r_Child.value === null) || (l_Child.value !== null && !!l_Child.value == false && r_Child.value === null) || (l_Child.value === null && r_Child.value !== null && !!r_Child.value == false)) {
             result = null;
           } else {
             result = !!(l_Child.value || r_Child.value);
@@ -669,7 +665,7 @@ export class SQLContext {
               throw `在还没有使用group by的时候，聚合函数和普通列不能混用`;
             }
             this.groupDS = [this.intermediatView];
-            this.rowSize = Math.min(this.rowSize, 1);//如果是空集扩展的数据集，则保留0
+            this.rowSize = Math.min(this.rowSize, 1); //如果是空集扩展的数据集，则保留0
             this.aggregateWithoutGroupClause = true;
             this.computedData = Array.from({ length: this.rowSize }, () => ({}));
             this.intermediatView = {};
@@ -745,7 +741,7 @@ export class SQLContext {
         this.intermediatView[tn] = this.intermediatView[tn].slice(0, n1);
       }
       this.groupDS = this.groupDS.slice(0, n1);
-      this.windowFrameDS = this.windowFrameDS.slice(0, n1);     
+      this.windowFrameDS = this.windowFrameDS.slice(0, n1);
       this.rowSize = Math.min(this.rowSize, n1);
     } else {
       for (let tn in this.intermediatView) {
@@ -764,6 +760,12 @@ export class SQLContext {
     let groupComputed = Array.from({ length: this.rowSize }, () => ({} as Cell));
     let groupKeys = new Set<string>();
 
+    let groupExps = {} as Record<string, ExpNode>;
+
+    for (let exp of exps) {
+      groupExps[`${exp.targetName}`] = exp;
+    }
+
     for (let i = 0; i < this.rowSize; i++) {
       let groupValues = [] as Cell[];
       for (let exp of exps) {
@@ -776,7 +778,6 @@ export class SQLContext {
           }
           groupKeys.add(cell.targetName);
         }
-        groupComputed[i][Symbol.for(`@${cell.targetName}_exp`)] = exp;
         groupComputed[i][cell.targetName] = cell.value!;
         groupValues.push(cell.value! as any);
       }
@@ -815,15 +816,11 @@ export class SQLContext {
       };
       [key: symbol]: Cell[];
     }[];
-    for (let i = 0; i < groups.length; i++) {
-      let groupLine = groupObj[groups[i]]!;
+    if (groups.length == 0) {
       let tvFrame = {} as any;
       for (let tn in this.intermediatView) {
         let data = [] as Cell[];
         let fields = this.intermediatView[tn].fields;
-        for (let line of groupLine) {
-          data.push(this.intermediatView[tn].data[line[Symbol.for('idx')]]);
-        }
         tvFrame[tn] = {
           data: data,
           fields: fields,
@@ -831,13 +828,35 @@ export class SQLContext {
       }
       for (let tn of Object.getOwnPropertySymbols(this.intermediatView)) {
         let data = [] as any[];
-        for (let line of groupLine) {
-          data.push(this.intermediatView[tn][line[Symbol.for('idx')]]);
-        }
         tvFrame[tn] = data;
       }
       groupTV.push(tvFrame);
+    } else {
+      for (let i = 0; i < groups.length; i++) {
+        let groupLine = groupObj[groups[i]]!;
+        let tvFrame = {} as any;
+        for (let tn in this.intermediatView) {
+          let data = [] as Cell[];
+          let fields = this.intermediatView[tn].fields;
+          for (let line of groupLine) {
+            data.push(this.intermediatView[tn].data[line[Symbol.for('idx')]]);
+          }
+          tvFrame[tn] = {
+            data: data,
+            fields: fields,
+          };
+        }
+        for (let tn of Object.getOwnPropertySymbols(this.intermediatView)) {
+          let data = [] as any[];
+          for (let line of groupLine) {
+            data.push(this.intermediatView[tn][line[Symbol.for('idx')]]);
+          }
+          tvFrame[tn] = data;
+        }
+        groupTV.push(tvFrame);
+      }
     }
+
     if (groupType == 'group') {
       this.groupDS = groupTV;
     } else {
@@ -852,40 +871,54 @@ export class SQLContext {
           fields: Set<string>;
         };
       } = {};
+
+      //创建TV
+      let fields = Object.keys(groupExps);
+      for (let colIdx = 0; colIdx < fields.length; colIdx++) {
+        let c = fields[colIdx];
+        let exp = groupExps[`${c}`] as ExpNode;
+        //只有getfield和getTableField往TV中创建字段
+        if (exp.op == 'getfield') {
+          let tableName = this.directFieldT[exp.value];
+          keepFields[exp.value] = this.directFieldT[exp.value];
+          if (newTV[tableName] === undefined) {
+            newTV[tableName] = {
+              data: [],
+              fields: new Set(),
+            };
+          }
+          newTV[tableName].fields.add(c);
+        } else if (exp.op == 'getTableField') {
+          let [tableName, fieldName] = (<string>exp.value).split('.');
+          if (this.directFieldT[fieldName] != undefined) {
+            keepFields[fieldName] = this.directFieldT[fieldName];
+            if (newTV[tableName] === undefined) {
+              newTV[tableName] = {
+                data: [],
+                fields: new Set(),
+              };
+            }
+            newTV[tableName].fields.add(fieldName);
+          }
+        } else {
+          this.computedData[0][c] = null;
+        }
+      }
+
       for (let i = 0; i < groups.length; i++) {
         let groupLine = groupObj[groups[i]]!;
-        let fields = Object.keys(groupLine[0]);
+        let fields = Object.keys(groupExps);
         for (let colIdx = 0; colIdx < fields.length; colIdx++) {
           let c = fields[colIdx];
-          let exp = groupLine[0][Symbol.for(`@${c}_exp`)] as ExpNode;
+          let exp = groupExps[`${c}`] as ExpNode;
           if (exp.op == 'getfield') {
             let tableName = this.directFieldT[exp.value];
-            if (i == 0) {
-              keepFields[exp.value] = this.directFieldT[exp.value];
-              if (newTV[tableName] === undefined) {
-                newTV[tableName] = {
-                  data: [],
-                  fields: new Set(),
-                };
-              }
-              newTV[tableName].fields.add(c);
-            }
             if (colIdx == 0) {
               newTV[tableName].data.push({});
             }
             newTV[tableName].data[newTV[tableName].data.length - 1][c] = groupLine[0][c];
           } else if (exp.op == 'getTableField') {
             let [tableName, fieldName] = (<string>exp.value).split('.');
-            if (i == 0 && this.directFieldT[fieldName] != undefined) {
-              keepFields[fieldName] = this.directFieldT[fieldName];
-              if (newTV[tableName] === undefined) {
-                newTV[tableName] = {
-                  data: [],
-                  fields: new Set(),
-                };
-              }
-              newTV[tableName].fields.add(fieldName);
-            }
             if (colIdx == 0) {
               newTV[tableName].data.push({});
             }
@@ -1054,21 +1087,21 @@ export class SQLContext {
     }
 
     //如果是一个空集，需要特殊处理
-if (this.rowSize === 0) {
-  for (let tn in this.intermediatView) {
-    let fields = this.intermediatView[tn].fields;
-    let nullRow = {} as Cell;
-    for (let k of fields) {
-      nullRow[k] = null;
+    if (this.rowSize === 0) {
+      for (let tn in this.intermediatView) {
+        let fields = this.intermediatView[tn].fields;
+        let nullRow = {} as Cell;
+        for (let k of fields) {
+          nullRow[k] = null;
+        }
+        this.intermediatView[tn].data = [nullRow];
+      }
+      for (let tn of Object.getOwnPropertySymbols(this.intermediatView)) {
+        this.intermediatView[tn] = [{}];
+      }
     }
-    this.intermediatView[tn].data = [nullRow];
-  }
-  for (let tn of Object.getOwnPropertySymbols(this.intermediatView)) {
-    this.intermediatView[tn] = [{}];
-  }
-}
-//保证至少有一行
-for (let row_idx = 0; row_idx < Math.max(this.rowSize, 1); row_idx++) {
+    //保证至少有一行
+    for (let row_idx = 0; row_idx < Math.max(this.rowSize, 1); row_idx++) {
       let tmpRow = {} as any;
       //处理每一列
       for (let exp_idx = 0; exp_idx < exps.length; exp_idx++) {
@@ -1098,9 +1131,9 @@ for (let row_idx = 0; row_idx < Math.max(this.rowSize, 1); row_idx++) {
       arr.push(tmpRow);
     }
     //如果本来就是空集，而且没有集合函数对其进行处理，则继续返回空集
-if (this.rowSize == 0 && !this.aggregateWithoutGroupClause) {
-    arr = [];
-}
+    if (this.rowSize == 0 && !this.aggregateWithoutGroupClause) {
+      arr = [];
+    }
 
     let ret = {
       data: arr,
@@ -1223,21 +1256,21 @@ if (this.rowSize == 0 && !this.aggregateWithoutGroupClause) {
           }
         }
         for (let tn in frameContext.intermediatView) {
-            if (this.intermediatView[tn] === undefined) {
-              this.intermediatView[tn] = {
-                data: frameContext.intermediatView[tn].data,
-                fields: frameContext.intermediatView[tn].fields,
-              };
-            } else {
-              this.intermediatView[tn].data = this.intermediatView[tn].data.concat(frameContext.intermediatView[tn].data);
-            }
+          if (this.intermediatView[tn] === undefined) {
+            this.intermediatView[tn] = {
+              data: frameContext.intermediatView[tn].data,
+              fields: frameContext.intermediatView[tn].fields,
+            };
+          } else {
+            this.intermediatView[tn].data = this.intermediatView[tn].data.concat(frameContext.intermediatView[tn].data);
           }
-          for (let tn of Object.getOwnPropertySymbols(frameContext.intermediatView)) {
-            if (this.intermediatView[tn] === undefined) {
-              this.intermediatView[tn] = [];
-            }
-            this.intermediatView[tn] = this.intermediatView[tn].concat(frameContext.intermediatView[tn]);
+        }
+        for (let tn of Object.getOwnPropertySymbols(frameContext.intermediatView)) {
+          if (this.intermediatView[tn] === undefined) {
+            this.intermediatView[tn] = [];
           }
+          this.intermediatView[tn] = this.intermediatView[tn].concat(frameContext.intermediatView[tn]);
+        }
       } else if (this.udf[fn.windowFunction.value! as string].type == 'windowFrame') {
         //窗口函数不使用窗口范围
         if (fn.windowFunction.modifier != undefined) {
@@ -1552,26 +1585,26 @@ if (this.rowSize == 0 && !this.aggregateWithoutGroupClause) {
       }
     }
     for (let tn of Object.getOwnPropertySymbols(this.intermediatView)) {
-        let originData = this.intermediatView[tn];
-        this.intermediatView[tn] = [];
-        for (let idx of resultIdx) {
-          this.intermediatView[tn].push(originData[idx]);
-        }
+      let originData = this.intermediatView[tn];
+      this.intermediatView[tn] = [];
+      for (let idx of resultIdx) {
+        this.intermediatView[tn].push(originData[idx]);
       }
-      {
-        let originData = this.groupDS;
-        this.groupDS = [];
-        for (let idx of resultIdx) {
-          this.groupDS.push(originData[idx]);
-        }
+    }
+    {
+      let originData = this.groupDS;
+      this.groupDS = [];
+      for (let idx of resultIdx) {
+        this.groupDS.push(originData[idx]);
       }
-      {
-        let originData = this.windowFrameDS;
-        this.windowFrameDS = [];
-        for (let idx of resultIdx) {
-          this.windowFrameDS.push(originData[idx]);
-        }
+    }
+    {
+      let originData = this.windowFrameDS;
+      this.windowFrameDS = [];
+      for (let idx of resultIdx) {
+        this.windowFrameDS.push(originData[idx]);
       }
+    }
     this.select_normal = false; //因为使用到了execExp，所以重置
     this.rowSize = resultIdx.length; //修改rowSize
     this.computedData = Array.from({ length: this.rowSize }, () => ({}));

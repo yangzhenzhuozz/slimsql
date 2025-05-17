@@ -1,5 +1,5 @@
 {
-  "name": "slimsql",
+  "name": "toysql-in-js",
   "version": "1.0.0",
   "description": "a slim SQL lib in with js",
   "license": "ISC",
