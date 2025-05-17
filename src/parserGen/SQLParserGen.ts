@@ -38,7 +38,7 @@ declare class SQLContext {
   limit(exp: ExpNode): void;
   groupBy(exps: ExpNode[], groupType: 'frame' | 'group'): void;
   where(exps: ExpNode): void;
-  select(select_clause: SelectClause,orderClause?:ExpNode[]): { data: Cell[]; fields: Set<string> };
+  select(select_clause: SelectClause, orderClause?: ExpNode[]): { data: Cell[]; fields: Set<string> };
   leftJoin(lefts: string[], right: string, exp: ExpNode): string[];
 }
 
@@ -56,8 +56,8 @@ declare interface SQLSession {
 declare let Context: {
   session: SQLSession;
   ctx: SQLContext;
+  ctxStack: SQLContext[]; //每次select的时候都先创建一个ctx
 };
-let ctxStack = [] as SQLContext[]; //每次select的时候都先创建一个ctx
 function gen() {
   let grammar: Grammar = {
     userCode: `//这个文件用SQLParserGen.ts生成的\nimport { assert } from './assert.js';\nimport { SQLContext } from './SQLSession.js';\n\n\nlet ctxStack=[] as SQLContext[];//每次select的时候都先创建一个ctx\n\n`,
@@ -195,9 +195,9 @@ function gen() {
                 select_clause.nodes = [...select_clause.nodes.slice(0, i), ...any_nodes, ...select_clause.nodes.slice(i + 1)];
               }
             }
-           
-            let ret = Context.ctx.select(select_clause,order_clause);
-            Context.ctx = ctxStack.pop()!;
+
+            let ret = Context.ctx.select(select_clause, order_clause);
+            Context.ctx = Context.ctxStack.pop()!;
             return ret;
           },
         },
@@ -205,7 +205,7 @@ function gen() {
       {
         'before_select:': {
           action: function () {
-            ctxStack.push(Context.ctx);
+            Context.ctxStack.push(Context.ctx);
             Context.ctx = new SQLContext(Context.session.udf);
           },
         },

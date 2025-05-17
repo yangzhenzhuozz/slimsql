@@ -212,6 +212,7 @@ export class SQLSession {
     return Parse(new Lexical(src), {
       session: this,
       ctx: undefined,
+      ctxStack: [] as SQLContext[],
     });
   }
 }
@@ -1176,7 +1177,7 @@ export class SQLContext {
     }
     this.groupBy(fn.partition, 'frame'); //各个不同分区的frame
     this.intermediatView = {}; //清除tv，因为开窗会改变顺序
-    this.computedData = [];
+    this.computedData = Array.from({ length: this.rowSize }, () => ({}));
     for (let frame of this.windowFrameDS) {
       let frameContext = new SQLContext(this.udf);
       for (let tn in frame) {
