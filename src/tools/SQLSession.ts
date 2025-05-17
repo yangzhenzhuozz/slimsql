@@ -13,7 +13,7 @@ export type UDFHanler =
     }
   | {
       type: 'aggregate';
-      handler: (list: any[][], modifier?: 'distinct' | 'all') => any | undefined;
+      handler: (list: any[][], isEmpty: boolean, modifier?: 'distinct' | 'all') => any | undefined;
     }
   | {
       type: 'windowFrame';
@@ -80,7 +80,10 @@ export class SQLSession {
     },
     avg: {
       type: 'aggregate',
-      handler: (list: number[][]) => {
+      handler: (list, isEmpty, modifier?: 'distinct' | 'all') => {
+        if (isEmpty) {
+          return null;
+        }
         if (list[0].length == 0) {
           throw `list函数的参数不能为空`;
         }
@@ -102,7 +105,10 @@ export class SQLSession {
     },
     count: {
       type: 'aggregate',
-      handler: (list, modifier?: 'distinct' | 'all') => {
+      handler: (list, isEmpty, modifier?: 'distinct' | 'all') => {
+        if (isEmpty) {
+          return 0;
+        }
         if (list[0].length == 0) {
           throw `count函数的参数不能为空`;
         }
@@ -122,7 +128,10 @@ export class SQLSession {
     },
     sum: {
       type: 'aggregate',
-      handler: (list, modifier?: 'distinct' | 'all') => {
+      handler: (list, isEmpty, modifier?: 'distinct' | 'all') => {
+        if (isEmpty) {
+          return null;
+        }
         if (list[0].length == 0) {
           throw `sum函数的参数不能为空`;
         }
@@ -217,6 +226,7 @@ export class SQLContext {
     [key: symbol]: Cell[];
   } = {};
   private rowSize = -1;
+  private aggregateWithoutGroupClause = false; //是否在没有使用group子句的时候就用了聚合函数
   private udf: UDF;
   private computedData = [] as Cell[]; //用于存放各个表达式计算结果
   private select_normal = false;
@@ -659,7 +669,8 @@ export class SQLContext {
               throw `在还没有使用group by的时候，聚合函数和普通列不能混用`;
             }
             this.groupDS = [this.intermediatView];
-            this.rowSize = 1;
+            this.rowSize = Math.min(this.rowSize, 1);//如果是空集扩展的数据集，则保留0
+            this.aggregateWithoutGroupClause = true;
             this.computedData = Array.from({ length: this.rowSize }, () => ({}));
             this.intermediatView = {};
           }
@@ -676,7 +687,7 @@ export class SQLContext {
             }
             list.push(args);
           }
-          result = this.udf[fun_name].handler(list, exp.modifier);
+          result = this.udf[fun_name].handler(list, this.rowSize === 0, exp.modifier);
         } else if (this.udf[fun_name].type == 'normal') {
           let args: Cell[] = [];
           for (let c of children!) {
@@ -1042,7 +1053,22 @@ export class SQLContext {
       this.orderBy(orderClause);
     }
 
-    for (let row_idx = 0; row_idx < this.rowSize; row_idx++) {
+    //如果是一个空集，需要特殊处理
+if (this.rowSize === 0) {
+  for (let tn in this.intermediatView) {
+    let fields = this.intermediatView[tn].fields;
+    let nullRow = {} as Cell;
+    for (let k of fields) {
+      nullRow[k] = null;
+    }
+    this.intermediatView[tn].data = [nullRow];
+  }
+  for (let tn of Object.getOwnPropertySymbols(this.intermediatView)) {
+    this.intermediatView[tn] = [{}];
+  }
+}
+//保证至少有一行
+for (let row_idx = 0; row_idx < Math.max(this.rowSize, 1); row_idx++) {
       let tmpRow = {} as any;
       //处理每一列
       for (let exp_idx = 0; exp_idx < exps.length; exp_idx++) {
@@ -1071,6 +1097,10 @@ export class SQLContext {
       }
       arr.push(tmpRow);
     }
+    //如果本来就是空集，而且没有集合函数对其进行处理，则继续返回空集
+if (this.rowSize == 0 && !this.aggregateWithoutGroupClause) {
+    arr = [];
+}
 
     let ret = {
       data: arr,
