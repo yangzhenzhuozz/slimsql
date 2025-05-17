@@ -1,0 +1,9 @@
+dist
+node_modules
+src/dfaData.json
+src/tools/SQLParser.ts
+src/tools/lexicalRules.ts
+src/tools/SQLParserDeclare.d.ts
+package-lock.json
+out.txt
+*.tgz

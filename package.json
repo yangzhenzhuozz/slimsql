@@ -1,0 +1,44 @@
+{
+  "name": "slimsql",
+  "version": "1.0.1",
+  "description": "a slim SQL in with js",
+  "license": "ISC",
+  "author": "",
+  "type": "module",
+  "main": "dist/main.js",
+  "module": "dist/main.esm.js",
+  "types": "dist/main.d.ts",
+  "scripts": {
+    "buildSQLParserGen": "tsc ./src/parserGen/SQLParserGen.ts --outDir ./dist --target ESnext --moduleResolution nodenext --module nodenext",
+    "SQLParserGen": "npm run buildSQLParserGen && node ./dist/parserGen/SQLParserGen.js",
+    "buildLexicalDFAGen": "npm run SQLParserGen && tsc ./src/parserGen/LexicalDFAGen.ts --outDir ./dist/parserGen --target ESnext --moduleResolution nodenext --module nodenext",
+    "LexicalDFAGen": "npm run buildLexicalDFAGen && node ./dist/parserGen/LexicalDFAGen.js",
+    "build_esm": "rollup -c",
+    "build": "npm run LexicalDFAGen && tsc -p tsconfig.json && npm run build_esm",
+    "pack": "npm run build && npm pack"
+  },
+  "files": [
+    "dist/tools",
+    "dist/main.d.ts",
+    "dist/main.js",
+    "dist/main.esm.js",
+    "src"
+  ],
+  "dependencies": {
+    "tscc-lr1": "^1.0.1",
+    "tslex": "^1.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "rollup": "^4.40.0",
+    "@rollup/plugin-node-resolve": "^16.0.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yangzhenzhuozz/slimsql.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yangzhenzhuozz/slimsql/issues"
+  },
+  "homepage": "https://github.com/yangzhenzhuozz/slimsql#readme"
+}

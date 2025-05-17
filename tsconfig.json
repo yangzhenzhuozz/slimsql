@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "nodenext",
+    "declaration": true,
+    "sourceMap": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "nodenext",
+    "outDir": "./dist"
+  },
+  "include": ["src/tools/**/*.ts", "src/parserGen/**/*.ts", "src/main.ts", "src/test/*.ts"],
+  "exclude": ["dist"]
+}
