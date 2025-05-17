@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { Grammar, default as TSCC } from 'tscc-lr1';
-import { ExpNode, FrameOffset, FrameRange, SelectClause, WindowFunction, Cell } from '../tools/ExpTree.js';
+import { ExpNode, FrameOffset, FrameRange, SelectClause, WindowFunction, Row } from '../tools/ExpTree.js';
 import { assert } from '../tools/assert.js';
 declare type UDFHanler =
   | {
@@ -21,7 +21,7 @@ declare type UDF = {
 declare class SQLContext {
   intermediatView: {
     [key: string]: {
-      data: Cell[];
+      data: Row[];
       fields: Set<string>;
     };
   };
@@ -29,7 +29,7 @@ declare class SQLContext {
   constructor(udf: UDF);
   addTV(
     view: {
-      data: Cell[];
+      data: Row[];
       fields: Set<string>;
     },
     name: string
@@ -38,7 +38,7 @@ declare class SQLContext {
   limit(exp: ExpNode): void;
   groupBy(exps: ExpNode[], groupType: 'frame' | 'group'): void;
   where(exps: ExpNode): void;
-  select(select_clause: SelectClause, orderClause?: ExpNode[]): { data: Cell[]; fields: Set<string> };
+  select(select_clause: SelectClause, orderClause?: ExpNode[]): { data: Row[]; fields: Set<string> };
   leftJoin(lefts: string[], right: string, exp: ExpNode): string[];
 }
 
@@ -46,7 +46,7 @@ declare class SQLContext {
 declare interface SQLSession {
   tableView: {
     [key: string]: {
-      data: Cell[];
+      data: Row[];
       fields: Set<string>;
     };
   };
@@ -135,19 +135,19 @@ function gen() {
       { nonassoc: ['as'] },
     ],
     accept: function ($) {
-      return $[0] as { data: Cell[]; fields: Set<string> };
+      return $[0] as { data: Row[]; fields: Set<string> };
     },
     BNF: [
       {
         'program:query': {
           action: function ($) {
-            return $[0] as { data: Cell[]; fields: Set<string> };
+            return $[0] as { data: Row[]; fields: Set<string> };
           },
         },
       },
       {
         'query:before_select select_clause from tableView where_clause group_clause order_clause limit_clause': {
-          action: function ($): { data: Cell[]; fields: Set<string> } {
+          action: function ($): { data: Row[]; fields: Set<string> } {
             let select_clause = $[1] as SelectClause;
             let where_clause = $[4] as ExpNode | undefined;
             let group_clause = $[5] as ExpNode | undefined;
@@ -445,7 +445,7 @@ function gen() {
       {
         'tableView:( query ) as  id': {
           action: function ($): string[] {
-            let query = $[1] as { data: Cell[]; fields: Set<string> };
+            let query = $[1] as { data: Row[]; fields: Set<string> };
             let id = $[4] as string;
             Context.ctx.addTV(
               {

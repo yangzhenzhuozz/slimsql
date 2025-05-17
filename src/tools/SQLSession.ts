@@ -1,5 +1,5 @@
 import { assert } from './assert.js';
-import { WindowFunction, Cell, ExpNode, SelectClause } from './ExpTree.js';
+import { WindowFunction, Row, ExpNode, SelectClause } from './ExpTree.js';
 import { Lexical } from './Lexical.js';
 import Parse from './SQLParser.js';
 export type FieldType = {
@@ -26,7 +26,7 @@ export type UDF = {
 export class SQLSession {
   public tableView: {
     [key: string]: {
-      data: Cell[];
+      data: Row[];
       fields: Set<string>;
     };
   } = {};
@@ -196,7 +196,7 @@ export class SQLSession {
       },
     },
   };
-  public registTableView(dataset: Cell[], tableName: string, fields?: Set<string>) {
+  public registTableView(dataset: Row[], tableName: string, fields?: Set<string>) {
     if (this.tableView[tableName] !== undefined) {
       console.log(`表:${tableName}已经存在,进行替换`);
     }
@@ -208,7 +208,7 @@ export class SQLSession {
   public reisgerUDF(name: string, obj: UDFHanler) {
     this.udf[name] = obj;
   }
-  public sql(src: string): { data: Cell[]; fields: Set<string> } {
+  public sql(src: string): { data: Row[]; fields: Set<string> } {
     return Parse(new Lexical(src), {
       session: this,
       ctx: undefined,
@@ -221,29 +221,29 @@ export class SQLContext {
   private duplicateFieldT: { [key: string]: Set<string> } = {}; //重复的属性,value是表名
   public intermediatView: {
     [key: string]: {
-      data: Cell[];
+      data: Row[];
       fields: Set<string>;
     };
-    [key: symbol]: Cell[];
+    [key: symbol]: Row[];
   } = {};
   private rowSize = -1;
   private aggregateWithoutGroupClause = false; //是否在没有使用group子句的时候就用了聚合函数
   private udf: UDF;
-  private computedData = [] as Cell[]; //用于存放各个表达式计算结果
+  private computedData = [] as Row[]; //用于存放各个表达式计算结果
   private select_normal = false;
   private groupDS = [] as {
     [key: string]: {
-      data: Cell[];
+      data: Row[];
       fields: Set<string>;
     };
-    [key: symbol]: Cell[];
+    [key: symbol]: Row[];
   }[];
   private windowFrameDS = [] as {
     [key: string]: {
-      data: Cell[];
+      data: Row[];
       fields: Set<string>;
     };
-    [key: symbol]: Cell[];
+    [key: symbol]: Row[];
   }[];
   public constructor(udf: UDF) {
     this.udf = udf;
@@ -251,31 +251,31 @@ export class SQLContext {
   public addTV(
     view:
       | {
-          data: Cell[];
+          data: Row[];
           fields: Set<string>;
         }
-      | Cell[],
+      | Row[],
     name: string | symbol
   ) {
     if (typeof name === 'symbol') {
-      this.intermediatView[name] = view as Cell[];
+      this.intermediatView[name] = view as Row[];
     } else {
       if (this.rowSize === -1) {
         this.rowSize = (
           view as {
-            data: Cell[];
+            data: Row[];
             fields: Set<string>;
           }
         ).data.length;
         this.computedData = Array.from({ length: this.rowSize }, () => ({}));
       }
       this.intermediatView[name] = view as {
-        data: Cell[];
+        data: Row[];
         fields: Set<string>;
       };
       let newFields = (
         view as {
-          data: Cell[];
+          data: Row[];
           fields: Set<string>;
         }
       ).fields;
@@ -515,7 +515,7 @@ export class SQLContext {
         if (l_Child.value === null) {
           result = null;
         } else {
-          let inList = [] as Cell[];
+          let inList = [] as Row[];
           for (let i = 1; i < children.length; i++) {
             inList.push(this.execExp(children[i], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate }).value);
           }
@@ -650,7 +650,7 @@ export class SQLContext {
           let grouSet:
             | {
                 [key: string]: {
-                  data: Cell[];
+                  data: Row[];
                   fields: Set<string>;
                 };
               }
@@ -671,7 +671,7 @@ export class SQLContext {
             this.computedData = Array.from({ length: this.rowSize }, () => ({}));
             this.intermediatView = {};
           }
-          let list = [] as Cell[][];
+          let list = [] as Row[][];
           let frameContext = new SQLContext(this.udf);
           for (let tn in this.groupDS[rowIdx]) {
             frameContext.addTV(this.groupDS[rowIdx][tn], tn);
@@ -686,7 +686,7 @@ export class SQLContext {
           }
           result = this.udf[fun_name].handler(list, this.rowSize === 0, exp.modifier);
         } else if (this.udf[fun_name].type == 'normal') {
-          let args: Cell[] = [];
+          let args: Row[] = [];
           for (let c of children!) {
             args.push(this.execExp(c, rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate }).value as any);
           }
@@ -758,7 +758,7 @@ export class SQLContext {
     this.computedData = Array.from({ length: this.rowSize }, () => ({}));
   }
   public groupBy(exps: ExpNode[], groupType: 'frame' | 'group') {
-    let groupComputed = Array.from({ length: this.rowSize }, () => ({} as Cell));
+    let groupComputed = Array.from({ length: this.rowSize }, () => ({} as Row));
     let groupKeys = new Set<string>();
 
     let groupExps = {} as Record<string, ExpNode>;
@@ -768,7 +768,7 @@ export class SQLContext {
     }
 
     for (let i = 0; i < this.rowSize; i++) {
-      let groupValues = [] as Cell[];
+      let groupValues = [] as Row[];
       for (let exp of exps) {
         let cell = this.execExp(exp, i, { isRecursive: false, inAggregate: false });
         //如果表名或者字段名无效,在execExp这里就抛出异常了
@@ -786,7 +786,7 @@ export class SQLContext {
       groupComputed[i][Symbol.for('@groupValues')] = groupValues.map((item) => item?.toString()).reduce((p, c) => p + ',' + c);
     }
 
-    let groupObj: Partial<Record<any, Cell[]>>;
+    let groupObj: Partial<Record<any, Row[]>>;
     if (Object.groupBy != undefined) {
       groupObj = Object.groupBy(groupComputed, (item) => item[Symbol.for('@groupValues')]);
     } else {
@@ -812,15 +812,15 @@ export class SQLContext {
 
     let groupTV = [] as {
       [key: string]: {
-        data: Cell[];
+        data: Row[];
         fields: Set<string>;
       };
-      [key: symbol]: Cell[];
+      [key: symbol]: Row[];
     }[];
     if (groups.length == 0) {
       let tvFrame = {} as any;
       for (let tn in this.intermediatView) {
-        let data = [] as Cell[];
+        let data = [] as Row[];
         let fields = this.intermediatView[tn].fields;
         tvFrame[tn] = {
           data: data,
@@ -837,7 +837,7 @@ export class SQLContext {
         let groupLine = groupObj[groups[i]]!;
         let tvFrame = {} as any;
         for (let tn in this.intermediatView) {
-          let data = [] as Cell[];
+          let data = [] as Row[];
           let fields = this.intermediatView[tn].fields;
           for (let line of groupLine) {
             data.push(this.intermediatView[tn].data[line[Symbol.for('idx')]]);
@@ -869,7 +869,7 @@ export class SQLContext {
       let keepFields = {} as { [key: string]: string }; //value是表名
       let newTV: {
         [key: string]: {
-          data: Cell[];
+          data: Row[];
           fields: Set<string>;
         };
       } = {};
@@ -1031,7 +1031,7 @@ export class SQLContext {
     this.groupDS = reOrderData(this.groupDS, newOrder);
     this.select_normal = false; //因为使用到了execExp，所以重置
   }
-  public select(select_clause: SelectClause, orderClause?: ExpNode[]): { data: Cell[]; fields: Set<string> } {
+  public select(select_clause: SelectClause, orderClause?: ExpNode[]): { data: Row[]; fields: Set<string> } {
     let exps = select_clause.nodes;
     let arr = [] as any[];
     let windowFrames = [] as WindowFunction[];
@@ -1095,7 +1095,7 @@ export class SQLContext {
     if (this.rowSize === 0) {
       for (let tn in this.intermediatView) {
         let fields = this.intermediatView[tn].fields;
-        let nullRow = {} as Cell;
+        let nullRow = {} as Row;
         for (let k of fields) {
           nullRow[k] = null;
         }
@@ -1143,7 +1143,7 @@ export class SQLContext {
     let ret = {
       data: arr,
       fields: retFields,
-    } as { data: Cell[]; fields: Set<string> };
+    } as { data: Row[]; fields: Set<string> };
 
     if (select_clause.modifier === 'all') {
       throw `不支持all`;
@@ -1192,7 +1192,7 @@ export class SQLContext {
         frameContext.addTV(frame[tn], tn);
       }
 
-      let orderedFrame = [] as Cell[];
+      let orderedFrame = [] as Row[];
       if (fn.order !== undefined) {
         frameContext.orderBy(fn.order);
         orderedFrame = frameContext.computedData;
@@ -1208,7 +1208,7 @@ export class SQLContext {
         //比如sum() over (partition by id order by name rows between unbounded preceding and unbounded following)
         if (fn.frameRange.start.offset == 'unbounded' && fn.frameRange.start.type == 'preceding' && fn.frameRange.end.offset == 'unbounded' && fn.frameRange.end.type == 'following') {
           frameContext.groupDS = [frameContext.intermediatView];
-          let aggregateVal = frameContext.execExp(fn.windowFunction, 0, { isRecursive: false, inAggregate: false }).value as Cell;
+          let aggregateVal = frameContext.execExp(fn.windowFunction, 0, { isRecursive: false, inAggregate: false }).value as Row;
           for (let i = 0; i < frameContext.rowSize; i++) {
             frameContext.intermediatView[Symbol.for('frameResult')][i][field_key] = aggregateVal;
           }
@@ -1242,7 +1242,7 @@ export class SQLContext {
             }
             let tmpTV: {
               [key: string]: {
-                data: Cell[];
+                data: Row[];
                 fields: Set<string>;
               };
             } = {};
@@ -1255,7 +1255,7 @@ export class SQLContext {
             }
             frameContext.intermediatView = tmpTV;
             frameContext.groupDS = [tmpTV];
-            let aggregateVal = frameContext.execExp(fn.windowFunction, 0, { isRecursive: false, inAggregate: false }).value as Cell;
+            let aggregateVal = frameContext.execExp(fn.windowFunction, 0, { isRecursive: false, inAggregate: false }).value as Row;
             frameContext.intermediatView = originTV;
             frameContext.intermediatView[Symbol.for('frameResult')][frameRowidx][field_key] = aggregateVal;
           }
@@ -1491,7 +1491,7 @@ export class SQLContext {
     for (let i = 0; i < joinResult.length; i++) {
       let rowIdx = joinResult[i];
       if (rowIdx[1] === null) {
-        let nullRow = {} as Cell;
+        let nullRow = {} as Row;
         for (let k of this.intermediatView[right].fields) {
           nullRow[k] = null;
         }
@@ -1514,7 +1514,7 @@ export class SQLContext {
           if (this.computedData[row_idx].leftTableIdx != this.computedData[row_idx - 1].leftTableIdx) {
             //但是前一行还没有被添加进去,这时候应该手工插入一个空行
             if (lastAddLeftIdx != this.computedData[row_idx - 1].leftTableIdx) {
-              let nullRow = {} as Cell;
+              let nullRow = {} as Row;
               for (let k of this.intermediatView[right].fields) {
                 nullRow[k] = null;
               }
@@ -1531,7 +1531,7 @@ export class SQLContext {
       }
       if (this.computedData[joinResult.length - 1].leftTableIdx != lastAddLeftIdx) {
         //但是前一行还没有被添加进去,这时候应该手工插入一个空行
-        let nullRow = {} as Cell;
+        let nullRow = {} as Row;
         for (let k of this.intermediatView[right].fields) {
           nullRow[k] = null;
         }

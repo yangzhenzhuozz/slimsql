@@ -66,6 +66,6 @@ export interface WindowFunction {
   targetName: string;
   frameRange: FrameRange;
 }
-export interface Cell {
+export interface Row {
   [key: string | number | symbol]: any; // 键可以是字符串、数字或符号
 }
