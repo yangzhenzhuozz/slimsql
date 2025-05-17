@@ -1010,6 +1010,9 @@ export class SQLContext {
     newOrder.sort(compare);
 
     let reOrderData = (data: any[], idxList: number[]): any[] => {
+      if(idxList.length == 0){
+        return data;
+      }
       let ret = [];
       for (let idx of idxList) {
         ret.push(data[idx]);
