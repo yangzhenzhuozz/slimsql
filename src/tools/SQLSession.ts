@@ -864,7 +864,8 @@ export class SQLContext {
       this.windowFrameDS = groupTV;
     }
     if (groupType == 'group') {
-      this.computedData = Array.from({ length: this.rowSize }, () => ({}));
+      //保证预留一行给空集做聚合函数
+      this.computedData = Array.from({ length: Math.max(this.rowSize, 1) }, () => ({}));
       let keepFields = {} as { [key: string]: string }; //value是表名
       let newTV: {
         [key: string]: {
@@ -1010,6 +1011,9 @@ export class SQLContext {
     newOrder.sort(compare);
 
     let reOrderData = (data: any[], idxList: number[]): any[] => {
+      if(idxList.length == 0){
+        return data;
+      }
       let ret = [];
       for (let idx of idxList) {
         ret.push(data[idx]);
