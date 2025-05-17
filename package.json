@@ -1,7 +1,7 @@
 {
-  "name": "toysql-in-js",
-  "version": "1.0.63",
-  "description": "a slim SQL lib in with js",
+  "name": "slimsql",
+  "version": "1.0.1",
+  "description": "a slim SQL in with js",
   "license": "ISC",
   "author": "",
   "type": "module",
