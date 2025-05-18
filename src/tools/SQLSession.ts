@@ -668,7 +668,6 @@ export class SQLContext {
             this.groupDS = [this.intermediatView];
             this.rowSize = Math.min(this.rowSize, 1); //如果是空集扩展的数据集，则保留0
             this.aggregateWithoutGroupClause = true;
-            this.computedData = Array.from({ length: this.rowSize }, () => ({}));
             this.intermediatView = {};
           }
           let list = [] as Row[][];
@@ -700,6 +699,9 @@ export class SQLContext {
         break;
       default:
         throw `Undefined opcode: ${op}`;
+    }
+    if (exp.op != 'immediate_val' && exp.op != 'getfield' && exp.op != 'getTableField') {
+      this.computedData[rowIdx][exp.targetName] = result;
     }
     if (!usedaggregate && !callerOption.inAggregate) {
       this.select_normal = true;
@@ -743,6 +745,7 @@ export class SQLContext {
       }
       this.groupDS = this.groupDS.slice(0, n1);
       this.windowFrameDS = this.windowFrameDS.slice(0, n1);
+      this.computedData = this.computedData.slice(0, n1);
       this.rowSize = Math.min(this.rowSize, n1);
     } else {
       for (let tn in this.intermediatView) {
@@ -753,9 +756,9 @@ export class SQLContext {
       }
       this.groupDS = this.groupDS.slice(n1 - 1, n1 + n2 - 1);
       this.windowFrameDS = this.windowFrameDS.slice(n1 - 1, n1 + n2 - 1);
+      this.computedData = this.computedData.slice(n1 - 1, n1 + n2 - 1);
       this.rowSize = Math.min(n2, this.rowSize - n1);
     }
-    this.computedData = Array.from({ length: this.rowSize }, () => ({}));
   }
   public groupBy(exps: ExpNode[], groupType: 'frame' | 'group') {
     let groupComputed = Array.from({ length: this.rowSize }, () => ({} as Row));
@@ -817,6 +820,7 @@ export class SQLContext {
       };
       [key: symbol]: Row[];
     }[];
+    this.intermediatView[Symbol.for('@computedData_of_group')] = this.computedData;
     if (groups.length == 0) {
       let tvFrame = {} as any;
       for (let tn in this.intermediatView) {
@@ -865,7 +869,6 @@ export class SQLContext {
     }
     if (groupType == 'group') {
       //保证预留一行给空集做聚合函数
-      this.computedData = Array.from({ length: Math.max(this.rowSize, 1) }, () => ({}));
       let keepFields = {} as { [key: string]: string }; //value是表名
       let newTV: {
         [key: string]: {
@@ -1011,7 +1014,7 @@ export class SQLContext {
     newOrder.sort(compare);
 
     let reOrderData = (data: any[], idxList: number[]): any[] => {
-      if(idxList.length == 0){
+      if (idxList.length == 0) {
         return data;
       }
       let ret = [];
@@ -1104,6 +1107,7 @@ export class SQLContext {
       for (let tn of Object.getOwnPropertySymbols(this.intermediatView)) {
         this.intermediatView[tn] = [{}];
       }
+      this.computedData = Array.from({ length: 1 }, () => ({}));
     }
     //保证至少有一行
     for (let row_idx = 0; row_idx < Math.max(this.rowSize, 1); row_idx++) {
@@ -1181,7 +1185,6 @@ export class SQLContext {
     }
     this.groupBy(fn.partition, 'frame'); //各个不同分区的frame
     this.intermediatView = {}; //清除tv，因为开窗会改变顺序
-    this.computedData = Array.from({ length: this.rowSize }, () => ({}));
     for (let frame of this.windowFrameDS) {
       let frameContext = new SQLContext(this.udf);
       for (let tn in frame) {
@@ -1315,6 +1318,11 @@ export class SQLContext {
         throw `不支持的窗口函数类型:${this.udf[fn.windowFunction.value! as string].type}`;
       }
     }
+    this.computedData = []; //重置缓存
+    for (let line of this.intermediatView[Symbol.for('@computedData_of_group')]) {
+      this.computedData.push(line);
+    }
+    delete this.intermediatView[Symbol.for('@computedData_of_group')];
   }
   private leftCross(idxs1: number[], idxs2: number[]): [number, number][] {
     let ret = [] as [number, number][];
@@ -1486,7 +1494,7 @@ export class SQLContext {
     this.intermediatView[right].data = [];
 
     this.rowSize = joinResult.length; //修改rowSize
-    this.computedData = Array.from({ length: this.rowSize }, () => ({})); //暂时存放连接条件
+    this.computedData = Array.from({ length: this.rowSize }, () => ({})); //join之后之前的缓存全部失效，可以存放连接条件
 
     for (let i = 0; i < joinResult.length; i++) {
       let rowIdx = joinResult[i];
