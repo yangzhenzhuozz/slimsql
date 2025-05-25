@@ -1364,6 +1364,11 @@ export class SQLContext {
 
     //比较器
     let comparator = (a: { v: any; idx: number }, b: { v: any; idx: number }): number => {
+      //让null小于非null，如果两个都是null，在join之前会被特殊判断
+      if (a.v === null && b.v === null) return 0;
+      if (a.v === null) return -1;
+      if (b.v === null) return 1;
+
       if (a.v < b.v) {
         return -1;
       } else if (a.v > b.v) {
@@ -1393,7 +1398,12 @@ export class SQLContext {
     for (; idx1 < values1.length; ) {
       let cmp: number;
       if (idx2 < values2.length) {
-        cmp = comparator(values1[idx1], values2[idx2]);
+        //遇到null就让右表先走
+        if (values1[idx1] === null || values2[idx2] === null) {
+          cmp = 1;
+        } else {
+          cmp = comparator(values1[idx1], values2[idx2]);
+        }
       } else {
         cmp = 1; //arr2已经走完了
       }
