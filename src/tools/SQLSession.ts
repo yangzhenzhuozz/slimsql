@@ -1398,8 +1398,8 @@ export class SQLContext {
     for (; idx1 < values1.length; ) {
       let cmp: number;
       if (idx2 < values2.length) {
-        //遇到null就让右表先走
-        if (values1[idx1] === null || values2[idx2] === null) {
+        //两边都是null就让右表先走
+        if (values1[idx1].v === null && values2[idx2].v === null) {
           cmp = 1;
         } else {
           cmp = comparator(values1[idx1], values2[idx2]);
