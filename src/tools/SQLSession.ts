@@ -1090,8 +1090,11 @@ export class SQLContext {
       }
     }
 
-    if (orderClause !== undefined) {
-      this.orderBy(orderClause);
+    //如果有distinct，则等group by之后再order by
+    if (select_clause.modifier !== 'distinct') {
+      if (orderClause !== undefined) {
+        this.orderBy(orderClause);
+      }
     }
 
     //如果是一个空集，需要特殊处理
@@ -1164,7 +1167,7 @@ export class SQLContext {
       let groupCtx = new SQLContext(this.udf);
       groupCtx.addTV(ret, 'distinct_result');
       groupCtx.groupBy(distinct_nodes, 'group');
-      ret = groupCtx.select({ nodes: distinct_nodes }); //使用group by去重
+      ret = groupCtx.select({ nodes: distinct_nodes }, orderClause); //使用group by去重
     }
 
     //清理tv、direct、duplicate
