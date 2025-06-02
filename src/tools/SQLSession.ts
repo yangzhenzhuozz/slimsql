@@ -995,12 +995,20 @@ export class SQLContext {
         }
 
         if (k.order == 'asc') {
+          if (va === null && vb === null) return 0;
+          if (va === null) return -1;
+          if (vb === null) return 1;
+
           if (va < vb) {
             return -1;
           } else if (va > vb) {
             return 1;
           }
         } else {
+          if (va === null && vb === null) return 0;
+          if (vb === null) return -1;
+          if (va === null) return 1;
+
           if (va > vb) {
             return -1;
           } else if (va < vb) {
