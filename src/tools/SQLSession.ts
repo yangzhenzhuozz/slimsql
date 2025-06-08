@@ -306,7 +306,7 @@ export class SQLContext {
    */
   private execExp(exp: ExpNode, rowIdx: number, callerOption: { isRecursive: boolean; inAggregate: boolean }): ExpNode {
     //避免字段名和计算结果一样，比如取一个名字叫做`concat(id,'a')`的字段，会造成误判
-    if (exp.op != 'immediate_val' && exp.op != 'getfield' && exp.op != 'getTableField' && this.computedData[rowIdx] != undefined && this.computedData[rowIdx][exp.targetName] !== undefined) {
+    if (exp.op != 'immediate_val' && exp.op != 'alias' && exp.op != 'getfield' && exp.op != 'getTableField' && this.computedData[rowIdx] != undefined && this.computedData[rowIdx][exp.targetName] !== undefined) {
       return {
         op: 'immediate_val',
         targetName: exp.targetName,
