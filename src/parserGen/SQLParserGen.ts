@@ -1079,12 +1079,34 @@ function gen() {
         },
       },
       {
+        'exp:exp not rlike exp': {
+          action: function ($): ExpNode {
+            return {
+              op: 'not-rlike',
+              children: [$[0] as ExpNode, $[3] as ExpNode],
+              targetName: `${($[0] as ExpNode).targetName} not rlike ${($[3] as ExpNode).targetName}`,
+            };
+          },
+        },
+      },
+      {
         'exp:exp like exp': {
           action: function ($): ExpNode {
             return {
               op: 'like',
               children: [$[0] as ExpNode, $[2] as ExpNode],
               targetName: `${($[0] as ExpNode).targetName} like ${($[2] as ExpNode).targetName}`,
+            };
+          },
+        },
+      },
+      {
+        'exp:exp not like exp': {
+          action: function ($): ExpNode {
+            return {
+              op: 'not-like',
+              children: [$[0] as ExpNode, $[3] as ExpNode],
+              targetName: `${($[0] as ExpNode).targetName} not like ${($[3] as ExpNode).targetName}`,
             };
           },
         },
@@ -1149,6 +1171,26 @@ function gen() {
               order,
               frameRange: $[5] as FrameRange,
               targetName: `${windowFunction.targetName} over (partition by ${partionName} ${orderName != '' ? 'order by ' + orderName : ''} ${frameRangeName})`,
+            };
+          },
+        },
+      },
+      {
+        'exp:exp not in ( in_list )': {
+          action: function ($): ExpNode {
+            let listName = '';
+            let listItem = $[4] as ExpNode[];
+            for (let i = 0; i < listItem.length; i++) {
+              if (i == 0) {
+                listName += listItem[i].targetName;
+              } else {
+                listName += ',' + listItem[i].targetName;
+              }
+            }
+            return {
+              op: 'not-in',
+              children: [$[0] as ExpNode, ...($[4] as ExpNode[])],
+              targetName: `${$[0].targetName} not in (${listName})`,
             };
           },
         },

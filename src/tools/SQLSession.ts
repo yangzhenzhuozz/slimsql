@@ -103,6 +103,58 @@ export class SQLSession {
         return count === 0 ? null : sum / count; //只取第一列的值累加
       },
     },
+    max: {
+      type: 'aggregate',
+      handler: (list, isEmpty, modifier?: 'distinct' | 'all') => {
+        if (isEmpty) return null;
+        if (list[0].length == 0) throw `max函数的参数不能为空`;
+        list = list.filter((i) => i[0] !== null);
+        if (list.length == 0) return null;
+        assert(typeof list[0][0] == 'number', 'max只能比较数字');
+        let values: number[];
+        if (modifier === 'all') {
+          throw `还不支持modifier:all`;
+        } else if (modifier === 'distinct') {
+          values = Array.from(new Set(list.map((item) => item[0])));
+        } else {
+          values = list.map((item) => item[0]);
+        }
+        let maxVal = -Infinity;
+        for (const v of values) {
+          if (v > maxVal) maxVal = v;
+        }
+        return maxVal;
+      },
+    },
+    min: {
+      type: 'aggregate',
+      handler: (list, isEmpty, modifier?: 'distinct' | 'all') => {
+        if (isEmpty) {
+          return null;
+        }
+        if (list[0].length == 0) {
+          throw `min函数的参数不能为空`;
+        }
+        list = list.filter((i) => i[0] !== null);
+        if (list.length == 0) {
+          return null;
+        }
+        assert(typeof list[0][0] == 'number', 'min只能比较数字');
+        let values: number[];
+        if (modifier === 'all') {
+          throw `还不支持modifier:all`;
+        } else if (modifier === 'distinct') {
+          values = Array.from(new Set(list.map((item) => item[0])));
+        } else {
+          values = list.map((item) => item[0]);
+        }
+        let minVal = Infinity;
+        for (const v of values) {
+          if (v < minVal) minVal = v;
+        }
+        return minVal;
+      },
+    },
     count: {
       type: 'aggregate',
       handler: (list, isEmpty, modifier?: 'distinct' | 'all') => {
@@ -509,17 +561,52 @@ export class SQLContext {
           result = !l_Child.value!;
         }
         break;
+      case 'not-in':
+        assert(children != undefined, 'not in子句的children不可能为空');
+        l_Child = this.execExp(children[0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
+        if (l_Child.value === null) {
+          result = null;
+        } else {
+          let ret: boolean | null = true; //默认是true,如果有匹配到值,则返回false
+          let hasNull = false;
+          for (let i = 1; i < children.length; i++) {
+            let v = this.execExp(children[i], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate }).value;
+            if (v === null) {
+              hasNull = true;
+            }
+            if (v === l_Child.value) {
+              ret = false; //如果有匹配到值,则返回false
+              break;
+            }
+          }
+          if (ret === true && hasNull) {
+            ret = null; //如果in list中有null,且没有匹配到值,则返回null
+          }
+          result = ret;
+        }
+        break;
       case 'in':
         assert(children != undefined, 'in子句的children不可能为空');
         l_Child = this.execExp(children[0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
         if (l_Child.value === null) {
           result = null;
         } else {
-          let inList = [] as Row[];
+          let ret: boolean | null = false;
+          let hasNull = false;
           for (let i = 1; i < children.length; i++) {
-            inList.push(this.execExp(children[i], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate }).value);
+            let v = this.execExp(children[i], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate }).value;
+            if (v === null) {
+              hasNull = true;
+            }
+            if (v === l_Child.value) {
+              ret = true;
+              break;
+            }
           }
-          result = inList.includes(l_Child.value!);
+          if (ret === false && hasNull) {
+            ret = null; //如果in list中有null,且没有匹配到值,则返回null
+          }
+          result = ret;
         }
         break;
       case 'rlike':
@@ -531,50 +618,108 @@ export class SQLContext {
         }
         result = l_Child.value!.match(new RegExp(r_Child.value!)) !== null;
         break;
-      case 'like':
-        assert(children != undefined, 'like子句的children不可能为空');
+      case 'not-rlike':
+        assert(children != undefined, 'rlike子句的children不可能为空');
         l_Child = this.execExp(children[0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
         r_Child = this.execExp(children[1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
         if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
-          throw 'like的参数必须是string类型';
+          throw 'rlike的参数必须是string类型';
         }
-        let regexStr = '^';
-        let escape = false;
-        let input = l_Child.value;
-        let pattern = r_Child.value;
+        result = !(l_Child.value!.match(new RegExp(r_Child.value!)) !== null);
+        break;
+      case 'like':
+        {
+          assert(children != undefined, 'like子句的children不可能为空');
+          l_Child = this.execExp(children[0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
+          r_Child = this.execExp(children[1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
+          if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
+            throw 'like的参数必须是string类型';
+          }
+          let regexStr = '^';
+          let escape = false;
+          let input = l_Child.value;
+          let pattern = r_Child.value;
 
-        for (const c of pattern) {
-          if (escape) {
-            // 处理转义字符（如 \%、\_ 或 \\）
-            regexStr += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); //把正则表达式的特殊字符转换成一个标记,$&表示原始字符,即把'('替换成'\('
-            escape = false;
-          } else if (c === '\\') {
-            // 开始转义
-            escape = true;
-          } else {
-            // 处理通配符和普通字符
-            switch (c) {
-              case '%':
-                regexStr += '.*';
-                break;
-              case '_':
-                regexStr += '.';
-                break;
-              default:
-                regexStr += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); //把正则表达式的特殊字符转换成一个标记,$&表示原始字符,即把'('替换成'\('
+          for (const c of pattern) {
+            if (escape) {
+              // 处理转义字符（如 \%、\_ 或 \\）
+              regexStr += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); //把正则表达式的特殊字符转换成一个标记,$&表示原始字符,即把'('替换成'\('
+              escape = false;
+            } else if (c === '\\') {
+              // 开始转义
+              escape = true;
+            } else {
+              // 处理通配符和普通字符
+              switch (c) {
+                case '%':
+                  regexStr += '.*';
+                  break;
+                case '_':
+                  regexStr += '.';
+                  break;
+                default:
+                  regexStr += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); //把正则表达式的特殊字符转换成一个标记,$&表示原始字符,即把'('替换成'\('
+              }
             }
           }
-        }
 
-        // 处理末尾未闭合的转义符（如模式以 \ 结尾）
-        if (escape) {
-          regexStr += '\\\\';
-        }
+          // 处理末尾未闭合的转义符（如模式以 \ 结尾）
+          if (escape) {
+            regexStr += '\\\\';
+          }
 
-        regexStr += '$';
-        // 创建正则表达式
-        const regex = new RegExp(regexStr);
-        result = regex.test(input);
+          regexStr += '$';
+          // 创建正则表达式
+          const regex = new RegExp(regexStr);
+          result = regex.test(input);
+        }
+        break;
+      case 'not-like':
+        {
+          assert(children != undefined, 'like子句的children不可能为空');
+          l_Child = this.execExp(children[0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
+          r_Child = this.execExp(children[1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
+          if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
+            throw 'like的参数必须是string类型';
+          }
+          let regexStr = '^';
+          let escape = false;
+          let input = l_Child.value;
+          let pattern = r_Child.value;
+
+          for (const c of pattern) {
+            if (escape) {
+              // 处理转义字符（如 \%、\_ 或 \\）
+              regexStr += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); //把正则表达式的特殊字符转换成一个标记,$&表示原始字符,即把'('替换成'\('
+              escape = false;
+            } else if (c === '\\') {
+              // 开始转义
+              escape = true;
+            } else {
+              // 处理通配符和普通字符
+              switch (c) {
+                case '%':
+                  regexStr += '.*';
+                  break;
+                case '_':
+                  regexStr += '.';
+                  break;
+                default:
+                  regexStr += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); //把正则表达式的特殊字符转换成一个标记,$&表示原始字符,即把'('替换成'\('
+              }
+            }
+          }
+
+          // 处理末尾未闭合的转义符（如模式以 \ 结尾）
+          if (escape) {
+            regexStr += '\\\\';
+          }
+
+          regexStr += '$';
+          // 创建正则表达式
+          const regex = new RegExp(regexStr);
+          result = !regex.test(input);
+        }
         break;
       case 'is_null':
         l_Child = this.execExp(children![0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });

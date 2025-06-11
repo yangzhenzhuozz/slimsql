@@ -1,6 +1,6 @@
 {
   "name": "slimsql",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "a slim SQL in with js",
   "license": "ISC",
   "author": "",
@@ -24,11 +24,10 @@
     "dist/main.esm.js",
     "src"
   ],
-  "dependencies": {
-    "tscc-lr1": "^1.0.1",
-    "tslex": "^1.0.1"
-  },
+  "dependencies": {},
   "devDependencies": {
+    "tscc-lr1": "^1.0.1",
+    "tslex": "^1.0.1",
     "@types/node": "^22.10.7",
     "rollup": "^4.40.0",
     "@rollup/plugin-node-resolve": "^16.0.1"
