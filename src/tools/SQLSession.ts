@@ -1263,6 +1263,7 @@ export class SQLContext {
       for (let tn of Object.getOwnPropertySymbols(this.intermediatView)) {
         this.intermediatView[tn] = [{}];
       }
+      this.intermediatView[Symbol.for('frameResult')] = [{}];
       this.computedData = Array.from({ length: 1 }, () => ({}));
     }
     //保证至少有一行
@@ -1333,6 +1334,9 @@ export class SQLContext {
     return ret;
   }
   private windowFunction(fn: WindowFunction) {
+    if (this.rowSize == 0) {
+      return;
+    }
     //对每一个窗口帧进行处理
     let field_key = fn.targetName;
     if (this.intermediatView[Symbol.for('frameResult')] !== undefined && this.intermediatView[Symbol.for('frameResult')].length > 0 && this.intermediatView[Symbol.for('frameResult')][0][field_key] !== undefined) {

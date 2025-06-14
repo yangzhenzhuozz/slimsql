@@ -20,7 +20,7 @@ session.registTableView(
     { 订单号: 105, 用户id: 4, 金额: 180, 状态: '已支付' },
     { 订单号: 106, 用户id: 6, 金额: 210, 状态: '已支付' },
   ],
-  'B'
+  '订单'
 );
 session.registTableView(
   [
@@ -29,11 +29,11 @@ session.registTableView(
     { 支付id: 1003, 订单号: 105, 支付方式: '支付宝', 支付时间: '2024-06-03' },
     { 支付id: 1004, 订单号: 106, 支付方式: '银行卡', 支付时间: '2024-06-04' },
   ],
-  'C'
+  '支付'
 );
 console.time('Execution Time');
 let ret = session.sql(`
-select 'abc' not rlike 'b' from 用户 limit 1
+select sum(1) over(order by id) from 用户 where id=100
 `);
 console.table(ret.data);
 console.timeEnd('Execution Time');
