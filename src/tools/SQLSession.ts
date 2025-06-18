@@ -894,14 +894,14 @@ export class SQLContext {
       this.rowSize = Math.min(this.rowSize, n1);
     } else {
       for (let tn in this.intermediatView) {
-        this.intermediatView[tn].data = this.intermediatView[tn].data.slice(n1 - 1, n1 + n2 - 1);
+        this.intermediatView[tn].data = this.intermediatView[tn].data.slice(n1, n1 + n2);
       }
       for (let tn of Object.getOwnPropertySymbols(this.intermediatView)) {
-        this.intermediatView[tn] = this.intermediatView[tn].slice(n1 - 1, n1 + n2 - 1);
+        this.intermediatView[tn] = this.intermediatView[tn].slice(n1, n1 + n2);
       }
-      this.groupDS = this.groupDS.slice(n1 - 1, n1 + n2 - 1);
-      this.windowFrameDS = this.windowFrameDS.slice(n1 - 1, n1 + n2 - 1);
-      this.computedData = this.computedData.slice(n1 - 1, n1 + n2 - 1);
+      this.groupDS = this.groupDS.slice(n1, n1 + n2);
+      this.windowFrameDS = this.windowFrameDS.slice(n1, n1 + n2);
+      this.computedData = this.computedData.slice(n1, n1 + n2);
       this.rowSize = Math.min(n2, this.rowSize - n1);
     }
   }
