@@ -613,26 +613,33 @@ export class SQLContext {
         assert(children != undefined, 'rlike子句的children不可能为空');
         l_Child = this.execExp(children[0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
         r_Child = this.execExp(children[1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
+        if (l_Child.value === null || r_Child.value === null) {
+          result = null;
+        } else {
         if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
           throw 'rlike的参数必须是string类型';
         }
         result = l_Child.value!.match(new RegExp(r_Child.value!)) !== null;
-        break;
+       } break;
       case 'not-rlike':
         assert(children != undefined, 'rlike子句的children不可能为空');
         l_Child = this.execExp(children[0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
         r_Child = this.execExp(children[1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
-        if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
+        if (l_Child.value === null || r_Child.value === null) {
+          result = null;
+        } else {if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
           throw 'rlike的参数必须是string类型';
         }
         result = !(l_Child.value!.match(new RegExp(r_Child.value!)) !== null);
-        break;
+        }break;
       case 'like':
         {
           assert(children != undefined, 'like子句的children不可能为空');
           l_Child = this.execExp(children[0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
           r_Child = this.execExp(children[1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
-          if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
+          if (l_Child.value === null || r_Child.value === null) {
+          result = null;
+        } else {if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
             throw 'like的参数必须是string类型';
           }
           let regexStr = '^';
@@ -673,13 +680,15 @@ export class SQLContext {
           const regex = new RegExp(regexStr);
           result = regex.test(input);
         }
-        break;
+        }break;
       case 'not-like':
         {
           assert(children != undefined, 'like子句的children不可能为空');
           l_Child = this.execExp(children[0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
           r_Child = this.execExp(children[1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
-          if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
+          if (l_Child.value === null || r_Child.value === null) {
+          result = null;
+        } else {if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
             throw 'like的参数必须是string类型';
           }
           let regexStr = '^';
@@ -720,7 +729,7 @@ export class SQLContext {
           const regex = new RegExp(regexStr);
           result = !regex.test(input);
         }
-        break;
+        }break;
       case 'is_null':
         l_Child = this.execExp(children![0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
         result = l_Child.value === null;
