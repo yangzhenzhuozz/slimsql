@@ -815,10 +815,11 @@ export class SQLContext {
             if (this.select_normal) {
               throw `在还没有使用group by的时候，聚合函数和普通列不能混用`;
             }
-            this.intermediatView[Symbol.for('@groupDS')] = [this.intermediatView];
+            let groupDS = [this.intermediatView];
             this.rowSize = Math.min(this.rowSize, 1); //如果是空集扩展的数据集，则保留0
             this.aggregateWithoutGroupClause = true;
             this.intermediatView = {};
+        this.intermediatView[Symbol.for('@groupDS')]=groupDS
           }
           let list = [] as Row[][];
           let frameContext = new SQLContext(this.udf);
