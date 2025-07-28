@@ -1273,7 +1273,10 @@ export class SQLContext {
         this.intermediatView[tn].data = [nullRow];
       }
       for (let tn of Object.getOwnPropertySymbols(this.intermediatView)) {
-        this.intermediatView[tn] = [{}];
+        //这个表不需要填充，在聚合函数里面会自行处理
+        if (tn !== Symbol.for('@groupDS')) {
+          this.intermediatView[tn] = [{}];
+        }
       }
       this.intermediatView[Symbol.for('frameResult')] = [{}];
       this.computedData = Array.from({ length: 1 }, () => ({}));
