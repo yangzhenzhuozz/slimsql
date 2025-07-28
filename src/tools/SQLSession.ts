@@ -277,26 +277,15 @@ export class SQLContext {
       fields: Set<string>;
     };
     [key: symbol]: Row[];
-  } = {};
+  } = {
+    [Symbol.for('@groupDS')]: [],
+    [Symbol.for('@windowFrameDS')]: [],
+  };
   private rowSize = -1;
   private aggregateWithoutGroupClause = false; //是否在没有使用group子句的时候就用了聚合函数
   private udf: UDF;
   private computedData = [] as Row[]; //用于存放各个表达式计算结果
   private select_normal = false;
-  private groupDS = [] as {
-    [key: string]: {
-      data: Row[];
-      fields: Set<string>;
-    };
-    [key: symbol]: Row[];
-  }[];
-  private windowFrameDS = [] as {
-    [key: string]: {
-      data: Row[];
-      fields: Set<string>;
-    };
-    [key: symbol]: Row[];
-  }[];
   public constructor(udf: UDF) {
     this.udf = udf;
   }
@@ -616,120 +605,127 @@ export class SQLContext {
         if (l_Child.value === null || r_Child.value === null) {
           result = null;
         } else {
-        if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
-          throw 'rlike的参数必须是string类型';
+          if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
+            throw 'rlike的参数必须是string类型';
+          }
+          result = l_Child.value!.match(new RegExp(r_Child.value!)) !== null;
         }
-        result = l_Child.value!.match(new RegExp(r_Child.value!)) !== null;
-       } break;
+        break;
       case 'not-rlike':
         assert(children != undefined, 'rlike子句的children不可能为空');
         l_Child = this.execExp(children[0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
         r_Child = this.execExp(children[1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
         if (l_Child.value === null || r_Child.value === null) {
           result = null;
-        } else {if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
-          throw 'rlike的参数必须是string类型';
+        } else {
+          if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
+            throw 'rlike的参数必须是string类型';
+          }
+          result = !(l_Child.value!.match(new RegExp(r_Child.value!)) !== null);
         }
-        result = !(l_Child.value!.match(new RegExp(r_Child.value!)) !== null);
-        }break;
+        break;
       case 'like':
         {
           assert(children != undefined, 'like子句的children不可能为空');
           l_Child = this.execExp(children[0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
           r_Child = this.execExp(children[1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
           if (l_Child.value === null || r_Child.value === null) {
-          result = null;
-        } else {if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
-            throw 'like的参数必须是string类型';
-          }
-          let regexStr = '^';
-          let escape = false;
-          let input = l_Child.value;
-          let pattern = r_Child.value;
+            result = null;
+          } else {
+            if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
+              throw 'like的参数必须是string类型';
+            }
+            let regexStr = '^';
+            let escape = false;
+            let input = l_Child.value;
+            let pattern = r_Child.value;
 
-          for (const c of pattern) {
-            if (escape) {
-              // 处理转义字符（如 \%、\_ 或 \\）
-              regexStr += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); //把正则表达式的特殊字符转换成一个标记,$&表示原始字符,即把'('替换成'\('
-              escape = false;
-            } else if (c === '\\') {
-              // 开始转义
-              escape = true;
-            } else {
-              // 处理通配符和普通字符
-              switch (c) {
-                case '%':
-                  regexStr += '.*';
-                  break;
-                case '_':
-                  regexStr += '.';
-                  break;
-                default:
-                  regexStr += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); //把正则表达式的特殊字符转换成一个标记,$&表示原始字符,即把'('替换成'\('
+            for (const c of pattern) {
+              if (escape) {
+                // 处理转义字符（如 \%、\_ 或 \\）
+                regexStr += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); //把正则表达式的特殊字符转换成一个标记,$&表示原始字符,即把'('替换成'\('
+                escape = false;
+              } else if (c === '\\') {
+                // 开始转义
+                escape = true;
+              } else {
+                // 处理通配符和普通字符
+                switch (c) {
+                  case '%':
+                    regexStr += '.*';
+                    break;
+                  case '_':
+                    regexStr += '.';
+                    break;
+                  default:
+                    regexStr += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); //把正则表达式的特殊字符转换成一个标记,$&表示原始字符,即把'('替换成'\('
+                }
               }
             }
-          }
 
-          // 处理末尾未闭合的转义符（如模式以 \ 结尾）
-          if (escape) {
-            regexStr += '\\\\';
-          }
+            // 处理末尾未闭合的转义符（如模式以 \ 结尾）
+            if (escape) {
+              regexStr += '\\\\';
+            }
 
-          regexStr += '$';
-          // 创建正则表达式
-          const regex = new RegExp(regexStr);
-          result = regex.test(input);
+            regexStr += '$';
+            // 创建正则表达式
+            const regex = new RegExp(regexStr);
+            result = regex.test(input);
+          }
         }
-        }break;
+        break;
       case 'not-like':
         {
           assert(children != undefined, 'like子句的children不可能为空');
           l_Child = this.execExp(children[0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
           r_Child = this.execExp(children[1], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
           if (l_Child.value === null || r_Child.value === null) {
-          result = null;
-        } else {if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
-            throw 'like的参数必须是string类型';
-          }
-          let regexStr = '^';
-          let escape = false;
-          let input = l_Child.value;
-          let pattern = r_Child.value;
+            result = null;
+          } else {
+            if (typeof l_Child.value !== 'string' || typeof r_Child.value !== 'string') {
+              throw 'like的参数必须是string类型';
+            }
+            let regexStr = '^';
+            let escape = false;
+            let input = l_Child.value;
+            let pattern = r_Child.value;
 
-          for (const c of pattern) {
-            if (escape) {
-              // 处理转义字符（如 \%、\_ 或 \\）
-              regexStr += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); //把正则表达式的特殊字符转换成一个标记,$&表示原始字符,即把'('替换成'\('
-              escape = false;
-            } else if (c === '\\') {
-              // 开始转义
-              escape = true;
-            } else {
-              // 处理通配符和普通字符
-              switch (c) {
-                case '%':
-                  regexStr += '.*';
-                  break;
-                case '_':
-                  regexStr += '.';
-                  break;
-                default:
-                  regexStr += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); //把正则表达式的特殊字符转换成一个标记,$&表示原始字符,即把'('替换成'\('
+            for (const c of pattern) {
+              if (escape) {
+                // 处理转义字符（如 \%、\_ 或 \\）
+                regexStr += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); //把正则表达式的特殊字符转换成一个标记,$&表示原始字符,即把'('替换成'\('
+                escape = false;
+              } else if (c === '\\') {
+                // 开始转义
+                escape = true;
+              } else {
+                // 处理通配符和普通字符
+                switch (c) {
+                  case '%':
+                    regexStr += '.*';
+                    break;
+                  case '_':
+                    regexStr += '.';
+                    break;
+                  default:
+                    regexStr += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); //把正则表达式的特殊字符转换成一个标记,$&表示原始字符,即把'('替换成'\('
+                }
               }
             }
-          }
 
-          // 处理末尾未闭合的转义符（如模式以 \ 结尾）
-          if (escape) {
-            regexStr += '\\\\';
-          }
+            // 处理末尾未闭合的转义符（如模式以 \ 结尾）
+            if (escape) {
+              regexStr += '\\\\';
+            }
 
-          regexStr += '$';
-          // 创建正则表达式
-          const regex = new RegExp(regexStr);
-          result = !regex.test(input);
+            regexStr += '$';
+            // 创建正则表达式
+            const regex = new RegExp(regexStr);
+            result = !regex.test(input);
+          }
         }
-        }break;
+        break;
       case 'is_null':
         l_Child = this.execExp(children![0], rowIdx, { isRecursive: true, inAggregate: callerOption.inAggregate });
         result = l_Child.value === null;
@@ -810,8 +806,8 @@ export class SQLContext {
               }
             | undefined;
 
-          if (this.groupDS[rowIdx] !== undefined) {
-            grouSet = this.groupDS[rowIdx];
+          if (this.intermediatView[Symbol.for('@groupDS')][rowIdx] !== undefined) {
+            grouSet = this.intermediatView[Symbol.for('@groupDS')][rowIdx];
           }
 
           //如果还没有group by或者开窗就使用聚合函数
@@ -819,15 +815,18 @@ export class SQLContext {
             if (this.select_normal) {
               throw `在还没有使用group by的时候，聚合函数和普通列不能混用`;
             }
-            this.groupDS = [this.intermediatView];
+            this.intermediatView[Symbol.for('@groupDS')] = [this.intermediatView];
             this.rowSize = Math.min(this.rowSize, 1); //如果是空集扩展的数据集，则保留0
             this.aggregateWithoutGroupClause = true;
             this.intermediatView = {};
           }
           let list = [] as Row[][];
           let frameContext = new SQLContext(this.udf);
-          for (let tn in this.groupDS[rowIdx]) {
-            frameContext.addTV(this.groupDS[rowIdx][tn], tn);
+          for (let tn of Object.getOwnPropertySymbols(this.intermediatView[Symbol.for('@groupDS')][rowIdx])) {
+            frameContext.addTV(this.intermediatView[Symbol.for('@groupDS')][rowIdx][tn], tn);
+          }
+          for (let tn in this.intermediatView[Symbol.for('@groupDS')][rowIdx]) {
+            frameContext.addTV(this.intermediatView[Symbol.for('@groupDS')][rowIdx][tn], tn);
           }
           for (let subLine = 0; subLine < frameContext.rowSize; subLine++) {
             let args = [];
@@ -897,8 +896,8 @@ export class SQLContext {
       for (let tn of Object.getOwnPropertySymbols(this.intermediatView)) {
         this.intermediatView[tn] = this.intermediatView[tn].slice(0, n1);
       }
-      this.groupDS = this.groupDS.slice(0, n1);
-      this.windowFrameDS = this.windowFrameDS.slice(0, n1);
+      this.intermediatView[Symbol.for('@groupDS')] = this.intermediatView[Symbol.for('@groupDS')].slice(0, n1);
+      this.intermediatView[Symbol.for('@windowFrameDS')] = this.intermediatView[Symbol.for('@windowFrameDS')].slice(0, n1);
       this.computedData = this.computedData.slice(0, n1);
       this.rowSize = Math.min(this.rowSize, n1);
     } else {
@@ -908,8 +907,8 @@ export class SQLContext {
       for (let tn of Object.getOwnPropertySymbols(this.intermediatView)) {
         this.intermediatView[tn] = this.intermediatView[tn].slice(n1, n1 + n2);
       }
-      this.groupDS = this.groupDS.slice(n1, n1 + n2);
-      this.windowFrameDS = this.windowFrameDS.slice(n1, n1 + n2);
+      this.intermediatView[Symbol.for('@groupDS')] = this.intermediatView[Symbol.for('@groupDS')].slice(n1, n1 + n2);
+      this.intermediatView[Symbol.for('@windowFrameDS')] = this.intermediatView[Symbol.for('@windowFrameDS')].slice(n1, n1 + n2);
       this.computedData = this.computedData.slice(n1, n1 + n2);
       this.rowSize = Math.min(n2, this.rowSize - n1);
     }
@@ -1017,9 +1016,9 @@ export class SQLContext {
     }
 
     if (groupType == 'group') {
-      this.groupDS = groupTV;
+      this.intermediatView[Symbol.for('@groupDS')] = groupTV;
     } else {
-      this.windowFrameDS = groupTV;
+      this.intermediatView[Symbol.for('@windowFrameDS')] = groupTV;
     }
     if (groupType == 'group') {
       //保证预留一行给空集做聚合函数
@@ -1029,6 +1028,7 @@ export class SQLContext {
           data: Row[];
           fields: Set<string>;
         };
+        [k: symbol]: Row[];
       } = {};
 
       //创建TV
@@ -1086,6 +1086,10 @@ export class SQLContext {
             this.computedData[i][c] = groupLine[0][c];
           }
         }
+      }
+      //复制临时表
+      for (let tn of Object.getOwnPropertySymbols(this.intermediatView)) {
+        newTV[tn] = this.intermediatView[tn];
       }
       this.intermediatView = newTV;
       this.directFieldT = keepFields;
@@ -1192,8 +1196,6 @@ export class SQLContext {
       this.intermediatView[tn] = reOrderData(this.intermediatView[tn], newOrder);
     }
     this.computedData = reOrderData(this.computedData, newOrder);
-    this.windowFrameDS = reOrderData(this.windowFrameDS, newOrder);
-    this.groupDS = reOrderData(this.groupDS, newOrder);
     this.select_normal = false; //因为使用到了execExp，所以重置
   }
   public select(select_clause: SelectClause, orderClause?: ExpNode[]): { data: Row[]; fields: Set<string> } {
@@ -1353,8 +1355,9 @@ export class SQLContext {
       return;
     }
     this.groupBy(fn.partition, 'frame'); //各个不同分区的frame
+    const windowFrameDS = this.intermediatView[Symbol.for('@windowFrameDS')];
     this.intermediatView = {}; //清除tv，因为开窗会改变顺序
-    for (let frame of this.windowFrameDS) {
+    for (let frame of windowFrameDS) {
       let frameContext = new SQLContext(this.udf);
       for (let tn in frame) {
         frameContext.addTV(frame[tn], tn);
@@ -1379,7 +1382,7 @@ export class SQLContext {
         //如果窗口范围是unbounded,则直接使用聚合函数的值填充
         //比如sum() over (partition by id order by name rows between unbounded preceding and unbounded following)
         if (fn.frameRange.start.offset == 'unbounded' && fn.frameRange.start.type == 'preceding' && fn.frameRange.end.offset == 'unbounded' && fn.frameRange.end.type == 'following') {
-          frameContext.groupDS = [frameContext.intermediatView];
+          frameContext.intermediatView[Symbol.for('@groupDS')] = [frameContext.intermediatView];
           let aggregateVal = frameContext.execExp(fn.windowFunction, 0, { isRecursive: false, inAggregate: false }).value as Row;
           for (let i = 0; i < frameContext.rowSize; i++) {
             frameContext.intermediatView[Symbol.for('frameResult')][i][field_key] = aggregateVal;
@@ -1426,7 +1429,7 @@ export class SQLContext {
               };
             }
             frameContext.intermediatView = tmpTV;
-            frameContext.groupDS = [tmpTV];
+            frameContext.intermediatView[Symbol.for('@groupDS')] = [tmpTV];
             let aggregateVal = frameContext.execExp(fn.windowFunction, 0, { isRecursive: false, inAggregate: false }).value as Row;
             frameContext.intermediatView = originTV;
             frameContext.intermediatView[Symbol.for('frameResult')][frameRowidx][field_key] = aggregateVal;
@@ -1741,17 +1744,17 @@ export class SQLContext {
         }
       }
       {
-        let originData = this.groupDS;
-        this.groupDS = [];
+        let originData = this.intermediatView[Symbol.for('@groupDS')];
+        this.intermediatView[Symbol.for('@groupDS')] = [];
         for (let idx of resultIdx) {
-          this.groupDS.push(originData[idx]);
+          this.intermediatView[Symbol.for('@groupDS')].push(originData[idx]);
         }
       }
       {
-        let originData = this.windowFrameDS;
-        this.windowFrameDS = [];
+        let originData = this.intermediatView[Symbol.for('@windowFrameDS')];
+        this.intermediatView[Symbol.for('@windowFrameDS')] = [];
         for (let idx of resultIdx) {
-          this.windowFrameDS.push(originData[idx]);
+          this.intermediatView[Symbol.for('@windowFrameDS')].push(originData[idx]);
         }
       }
       this.rowSize = resultIdx.length; //修改rowSize
@@ -1784,17 +1787,17 @@ export class SQLContext {
       }
     }
     {
-      let originData = this.groupDS;
-      this.groupDS = [];
+      let originData = this.intermediatView[Symbol.for('@groupDS')];
+      this.intermediatView[Symbol.for('@groupDS')] = [];
       for (let idx of resultIdx) {
-        this.groupDS.push(originData[idx]);
+        this.intermediatView[Symbol.for('@groupDS')].push(originData[idx]);
       }
     }
     {
-      let originData = this.windowFrameDS;
-      this.windowFrameDS = [];
+      let originData = this.intermediatView[Symbol.for('@windowFrameDS')];
+      this.intermediatView[Symbol.for('@windowFrameDS')] = [];
       for (let idx of resultIdx) {
-        this.windowFrameDS.push(originData[idx]);
+        this.intermediatView[Symbol.for('@windowFrameDS')].push(originData[idx]);
       }
     }
     this.select_normal = false; //因为使用到了execExp，所以重置
