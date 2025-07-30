@@ -123,9 +123,9 @@ function gen() {
       'row',
     ],
     association: [
-      { left: ['not'] },
       { left: ['or'] },
       { left: ['and'] },
+      { left: ['not'] },
       { left: ['is', '<', '<=', '=', '>', '>=', '!=', 'rlike', 'like', 'in'] },
       { left: ['%'] },
       { left: ['+', '-'] },
