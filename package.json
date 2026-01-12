@@ -1,6 +1,6 @@
 {
   "name": "slimsql",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "a slim SQL in with js",
   "license": "ISC",
   "author": "",
@@ -8,6 +8,17 @@
   "main": "dist/main.js",
   "module": "dist/main.esm.js",
   "types": "dist/main.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/main.d.ts",
+      "import": "./dist/main.esm.js",
+      "require": "./dist/main.js"
+    },
+    "./tools/*": {
+      "types": "./dist/tools/*.d.ts",
+      "import": "./dist/tools/*.js"
+    }
+  },
   "scripts": {
     "buildSQLParserGen": "tsc ./src/parserGen/SQLParserGen.ts --outDir ./dist --target ESnext --moduleResolution nodenext --module nodenext",
     "SQLParserGen": "npm run buildSQLParserGen && node ./dist/parserGen/SQLParserGen.js",
